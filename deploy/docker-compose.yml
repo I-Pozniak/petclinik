@@ -1,0 +1,23 @@
+services:
+  petclinic:
+    image: ${ECR_REPOSITORY_URI}:latest
+    container_name: petclinic-app
+    restart: always
+    ports:
+      - "8080:8080"
+
+    env_file:
+      - app_secrets.env
+
+    environment:
+      - SPRING_PROFILES_ACTIVE=mysql
+      - SPRING_DATASOURCE_URL=jdbc:mysql://${DB_HOST}:${DB_PORT}/${DB_NAME}?useUnicode=true&characterEncoding=UTF8&useSSL=false
+      - SPRING_DATASOURCE_USERNAME=${DB_USERNAME}
+      - SPRING_DATASOURCE_PASSWORD=${DB_PASSWORD}
+      - SPRING_JPA_SHOW_SQL=true
+
+    logging:
+        driver: "json-file"
+        options:
+            max-size: "10m"
+            max-file: "3"
