@@ -1,0 +1,22 @@
+plugin: amazon.aws.aws_ec2
+regions:
+  - eu-north-1
+
+filters:
+  tag:Project: PetClinic
+  instance-state-name: [running]
+
+# Створюємо групу на основі тегу
+keyed_groups:
+  - key: tags.Name
+    prefix: aws_tag_
+    separator: ""
+  - key: tags.Project
+    prefix: aws_tag_
+    separator: ""
+
+hostnames:
+  - public-ip-address
+
+compose:
+  ansible_host: public_ip_address

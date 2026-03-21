@@ -1,0 +1,37 @@
+- name: Install Java 17 (Required for Jenkins)
+  dnf:
+    name: java-17-amazon-corretto
+    state: present
+
+- name: Add Jenkins Repository
+  get_url:
+    url: https://pkg.jenkins.io/redhat-stable/jenkins.repo
+    dest: /etc/yum.repos.d/jenkins.repo
+
+- name: Import Jenkins GPG Key
+  rpm_key:
+    state: present
+    key: https://pkg.jenkins.io/redhat-stable/jenkins.io-2023.key
+
+- name: Install Jenkins, Git and Docker
+  dnf:
+    name:
+      - jenkins
+      - git
+      - docker
+    state: present
+
+- name: Add jenkins user to docker group
+  user:
+    name: jenkins
+    groups: docker
+    append: yes
+
+- name: Start and enable Jenkins & Docker
+  service:
+    name: "{{ item }}"
+    state: started
+    enabled: yes
+  loop:
+    - jenkins
+    - docker

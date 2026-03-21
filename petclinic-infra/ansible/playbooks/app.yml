@@ -1,0 +1,10 @@
+---
+- name: Petclinic Deployment
+  hosts: aws_tag_petclinic_app_instance
+  gather_facts: yes
+
+  roles:
+    - baseline
+    - docker
+    - secrets
+    - app

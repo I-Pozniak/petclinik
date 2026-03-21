@@ -1,0 +1,9 @@
+- name: Install and Configure Jenkins Master
+  hosts: aws_tag_jenkins
+  become: yes
+  gather_facts: yes
+
+  roles:
+    - baseline
+    - docker
+    - jenkins

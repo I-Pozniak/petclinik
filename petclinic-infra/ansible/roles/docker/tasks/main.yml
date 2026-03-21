@@ -1,0 +1,41 @@
+- name: Ensure docker packages installed
+  become: true
+  package:
+    name: "{{ docker_packages }}"
+    state: present
+
+- name: Start and enable docker service
+  become: true
+  service:
+    name: docker
+    state: started
+    enabled: true
+
+- name: Ensure users exist
+  become: true
+  user:
+    name: "{{ item.name }}"
+    state: present
+  loop: "{{ docker_users }}"
+
+- name: Add users to docker group
+  become: true
+  user:
+    name: "{{ item.name }}"
+    groups: docker
+    append: true
+  loop: "{{ docker_users }}"
+
+- name: Create Docker cli plugin directory
+  become: true
+  file:
+    path: /usr/local/lib/docker/cli-plugins
+    state: directory
+    mode: '0755'
+
+- name: Install Docker Compose plugin
+  become: true
+  get_url:
+    url: https://github.com/docker/compose/releases/latest/download/docker-compose-linux-x86_64
+    dest: /usr/local/lib/docker/cli-plugins/docker-compose
+    mode: '0755'

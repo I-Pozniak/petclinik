@@ -1,0 +1,15 @@
+- name: Create application directory
+  file:
+    path: "{{ app_directory }}"
+    state: directory
+    owner: ec2-user
+    mode: '0755'
+
+- name: Ensure user can write permissions
+  acl:
+    path: "{{ app_directory }}"
+    entity: ec2-user
+    etype: user
+    permissions: rwx
+    state: present
+

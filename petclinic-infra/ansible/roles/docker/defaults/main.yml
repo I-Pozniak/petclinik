@@ -1,0 +1,9 @@
+#SPDX-License-Identifier: MIT-0
+---
+# defaults file for baseline
+docker_packages:
+  - docker
+  - python3-pip
+
+docker_users:
+  - name: ec2-user
