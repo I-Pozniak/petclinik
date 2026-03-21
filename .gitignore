@@ -208,7 +208,8 @@ __marimo__/
 .terraform/
 .idea/
 target/
-.terraform/
+petclinic-infra/.terraform/
+petclinic-infra/terraform/terraform.tfvars
 *.tfstate
 *.pem
 .env
