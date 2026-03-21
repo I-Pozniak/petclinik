@@ -1,5 +1,9 @@
 pipeline {
     agent any
+    tools {
+        maven 'Maven'
+        terraform 'Terraform'
+    }
 
     environment {
 
