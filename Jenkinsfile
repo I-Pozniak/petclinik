@@ -30,9 +30,18 @@ pipeline {
                             returnStdout: true
                         ).trim()
 
-                        def props = new groovy.json.JsonSlurper().parseText(tfOutputJson)
+                        def props = new groovy.json.JsonSlurperClassic().parseText(tfOutputJson)
 
-                        env.TF_AWS_REGION = props.aws_region?.value?.toString()?.trim()
+                        def readTfOutput = { Map outputMap, String key ->
+                            def item = outputMap[key]
+                            if (item == null) {
+                                return ''
+                            }
+                            def rawValue = (item instanceof Map && item.containsKey('value')) ? item['value'] : item
+                            return rawValue == null ? '' : rawValue.toString().trim()
+                        }
+
+                        env.TF_AWS_REGION = readTfOutput(props, 'aws_region')
                         env.TF_ECR_URL    = props.ecr_repository_url?.value?.toString()?.trim()
                         env.TF_EC2_IP     = props.ec2_public_ip?.value?.toString()?.trim()
                         env.TF_ALB_URL    = props.alb_dns_name?.value?.toString()?.trim()
