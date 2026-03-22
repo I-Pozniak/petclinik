@@ -26,14 +26,61 @@ pipeline {
                 script {
                     echo "📡 Отримуємо параметри з Terraform..."
                     dir("${env.TF_DIR}") {
+                        // Check AWS credentials first
+                        echo "=== Checking AWS Credentials ==="
+                        sh "aws sts get-caller-identity"
+
                         // Initialize terraform with backend configuration
+                        echo "=== Initializing Terraform ==="
                         sh "terraform init -no-color -input=false -reconfigure"
 
-                        // Extract outputs with error handling
-                        env.AWS_REGION = sh(script: "terraform output -raw aws_region", returnStdout: true).trim()
-                        env.EC2_IP     = sh(script: "terraform output -raw ec2_public_ip", returnStdout: true).trim()
-                        env.ECR_URL    = sh(script: "terraform output -raw ecr_repository_url", returnStdout: true).trim()
-                        env.ALB_URL    = sh(script: "terraform output -raw alb_dns_name 2>/dev/null || echo 'N/A'", returnStdout: true).trim()
+                        // Verify state file exists
+                        echo "=== Checking Terraform State ==="
+                        def stateCheck = sh(script: "terraform state list 2>&1 | head -5", returnStdout: true).trim()
+                        echo "State preview: ${stateCheck}"
+
+                        if (stateCheck.contains("No state file was found") || stateCheck.contains("Error")) {
+                            error("❌ Terraform state is not available. Please run 'terraform apply' first.")
+                        }
+
+                        // First, let's see what outputs are available
+                        echo "=== Available Terraform Outputs ==="
+                        sh "terraform output -no-color"
+
+                        // Try JSON output first for better parsing
+                        echo "=== Extracting Outputs via JSON ==="
+                        def outputsJson = sh(script: "terraform output -json", returnStdout: true).trim()
+                        echo "JSON Outputs: ${outputsJson}"
+
+                        // Parse JSON to extract values
+                        def outputs = readJSON text: outputsJson
+
+                        def awsRegion = outputs.aws_region?.value ?: ''
+                        def ec2Ip = outputs.ec2_public_ip?.value ?: ''
+                        def ecrUrl = outputs.ecr_repository_url?.value ?: ''
+                        def albUrl = outputs.alb_dns_name?.value ?: 'N/A'
+
+                        echo "Parsed AWS Region: [${awsRegion}]"
+                        echo "Parsed EC2 IP: [${ec2Ip}]"
+                        echo "Parsed ECR URL: [${ecrUrl}]"
+                        echo "Parsed ALB URL: [${albUrl}]"
+
+                        // Validate extracted values
+                        if (!awsRegion || awsRegion == '') {
+                            error("❌ Failed to extract AWS_REGION from outputs")
+                        }
+                        if (!ec2Ip || ec2Ip == '') {
+                            error("❌ Failed to extract EC2_IP from outputs")
+                        }
+                        if (!ecrUrl || ecrUrl == '') {
+                            error("❌ Failed to extract ECR_URL from outputs")
+                        }
+
+                        // Assign to environment variables
+                        env.AWS_REGION = awsRegion
+                        env.EC2_IP = ec2Ip
+                        env.ECR_URL = ecrUrl
+                        env.ALB_URL = albUrl
 
                         echo "✅ AWS Region: ${env.AWS_REGION}"
                         echo "✅ EC2 IP: ${env.EC2_IP}"
