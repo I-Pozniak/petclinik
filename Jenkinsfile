@@ -12,10 +12,10 @@ pipeline {
         TELEGRAM_TOKEN   = credentials('telegram_token')
         TELEGRAM_CHAT_ID = credentials('telegram_chat_id')
 
-        TF_AWS_REGION = ''
-        TF_ECR_URL    = ''
-        TF_EC2_IP     = ''
-        TF_ALB_URL    = ''
+        TF_AWS_REGION = ""
+        TF_ECR_URL    = ""
+        TF_EC2_IP     = ""
+        TF_ALB_URL    = ""
     }
 
     stages {
@@ -25,11 +25,12 @@ pipeline {
                     dir("${env.TF_DIR}") {
                         sh "terraform init -no-color"
 
-                        def tfOutputJson = sh(script: "terraform output -json", returnStdout: true).trim()
-                        echo "Terraform raw output: ${tfOutputJson}"
+                        def tfOutputJson = sh(
+                            script: "terraform output -json",
+                            returnStdout: true
+                        ).trim()
 
                         def props = new groovy.json.JsonSlurper().parseText(tfOutputJson)
-                        echo "Terraform output keys: ${props.keySet().join(', ')}"
 
                         env.TF_AWS_REGION = props.aws_region?.value?.toString()?.trim()
                         env.TF_ECR_URL    = props.ecr_repository_url?.value?.toString()?.trim()
@@ -37,19 +38,19 @@ pipeline {
                         env.TF_ALB_URL    = props.alb_dns_name?.value?.toString()?.trim()
 
                         if (!env.TF_AWS_REGION) {
-                            error("Terraform output 'aws_region' is empty or missing")
+                            error("Terraform output 'aws_region' is empty")
                         }
                         if (!env.TF_ECR_URL) {
-                            error("Terraform output 'ecr_repository_url' is empty or missing")
+                            error("Terraform output 'ecr_repository_url' is empty")
                         }
                         if (!env.TF_EC2_IP) {
-                            error("Terraform output 'ec2_public_ip' is empty or missing")
+                            error("Terraform output 'ec2_public_ip' is empty")
                         }
                         if (!env.TF_ALB_URL) {
-                            error("Terraform output 'alb_dns_name' is empty or missing")
+                            error("Terraform output 'alb_dns_name' is empty")
                         }
 
-                        echo "Cloud parameters loaded successfully: Region=${env.TF_AWS_REGION}, ECR=${env.TF_ECR_URL}, EC2=${env.TF_EC2_IP}, ALB=${env.TF_ALB_URL}"
+                        echo "Cloud parameters loaded: Region=${env.TF_AWS_REGION}, ECR=${env.TF_ECR_URL}, EC2=${env.TF_EC2_IP}, ALB=${env.TF_ALB_URL}"
                     }
                 }
             }
@@ -68,17 +69,14 @@ pipeline {
                     echo "Region: ${env.TF_AWS_REGION}"
                     echo "ECR URL: ${env.TF_ECR_URL}"
 
-                    // Extract the registry URL (everything before the last slash)
                     def ecrRegistry = env.TF_ECR_URL.split('/')[0]
                     echo "ECR Registry: ${ecrRegistry}"
 
-                    // Authenticate Docker against ECR
                     sh """
                         aws ecr get-login-password --region ${env.TF_AWS_REGION} | \
                         docker login --username AWS --password-stdin ${ecrRegistry}
                     """
 
-                    // Build and tag the Docker image
                     sh """
                         docker build \
                           -t ${env.TF_ECR_URL}:latest \
@@ -86,7 +84,6 @@ pipeline {
                           .
                     """
 
-                    // Push both image tags
                     sh "docker push ${env.TF_ECR_URL}:latest"
                     sh "docker push ${env.TF_ECR_URL}:${env.BUILD_NUMBER}"
 
@@ -101,17 +98,14 @@ pipeline {
                     script {
                         echo "Deploying to ${env.TF_EC2_IP}..."
 
-                        // Copy the docker-compose file to the target server
                         sh """
                             scp -o StrictHostKeyChecking=no \
                             deploy/docker-compose.yml \
                             ec2-user@${env.TF_EC2_IP}:/opt/petclinic/
                         """
 
-                        // Extract the registry URL
                         def ecrRegistry = env.TF_ECR_URL.split('/')[0]
 
-                        // Run deployment commands on the remote server
                         sh """
                             ssh -o StrictHostKeyChecking=no ec2-user@${env.TF_EC2_IP} << EOF
                                 cd /opt/petclinic
