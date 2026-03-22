@@ -15,6 +15,10 @@ services:
       - SPRING_DATASOURCE_USERNAME=${DB_USERNAME}
       - SPRING_DATASOURCE_PASSWORD=${DB_PASSWORD}
       - SPRING_JPA_SHOW_SQL=true
+      - SPRING_SQL_INIT_MODE=always
+      - SPRING_SQL_INIT_SCHEMA_LOCATIONS=classpath:db/mysql/schema.sql
+      - SPRING_SQL_INIT_DATA_LOCATIONS=classpath:db/mysql/data.sql
+      - SPRING_SQL_INIT_CONTINUE_ON_ERROR=false
 
     logging:
         driver: "json-file"
