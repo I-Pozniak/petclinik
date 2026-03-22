@@ -102,43 +102,31 @@ pipeline {
         }
 
         stage('Deploy to App Server') {
-            steps {
-                sshagent(['web']) {
-                    script {
-                        echo "Deploying to ${env.TF_EC2_IP}..."
+    steps {
+        script {
+            // Використовуємо SSH-агент для доступу за PEM-ключем
+            sshagent(['web']) {
 
-                        // 1. Securely copy to the ec2-user's home directory first
-                        sh """
-                            scp -o StrictHostKeyChecking=no \
-                            deploy/docker-compose.yml \
-                            ec2-user@${env.TF_EC2_IP}:/home/ec2-user/docker-compose.yml
-                        """
+                // 1. Створюємо папку на ВІДДАЛЕНОМУ сервері (якщо її немає)
+                sh "ssh -o StrictHostKeyChecking=no ec2-user@${env.TF_EC2_IP} 'sudo mkdir -p /opt/petclinic && sudo chown ec2-user:ec2-user /opt/petclinic'"
 
-                        def ecrRegistry = env.TF_ECR_URL.split('/')[0]
+                // 2. Копіюємо файл .env з Jenkins на App Server
+                // Важливо: ми копіюємо ЛОКАЛЬНИЙ файл на ВІДДАЛЕНИЙ IP
+                sh "scp -o StrictHostKeyChecking=no app_secrets.env ec2-user@${env.TF_EC2_IP}:/opt/petclinic/app_secrets.env"
 
-                        // 2. SSH in, set up the directory with sudo, move the file, and run Docker
-                        sh """
-                            ssh -o StrictHostKeyChecking=no ec2-user@${env.TF_EC2_IP} bash -s << 'ENDSSH'
-                                # Create the directory if it doesn't exist
-                                sudo mkdir -p /opt/petclinic
+                // 3. Копіюємо docker-compose.yml на App Server
+                sh "scp -o StrictHostKeyChecking=no docker-compose.yml ec2-user@${env.TF_EC2_IP}:/opt/petclinic/docker-compose.yml"
 
-                                # Move the file into place
-                                sudo mv /home/ec2-user/docker-compose.yml /opt/petclinic/docker-compose.yml
-
-                                # Navigate and deploy
-                                cd /opt/petclinic
-                                aws ecr get-login-password --region ${env.TF_AWS_REGION} | docker login --username AWS --password-stdin ${ecrRegistry}
-                                export ECR_REPO_URL=${env.TF_ECR_URL}
-                                docker compose pull
-                                docker compose up -d
-ENDSSH
-                        """
-
-                        echo "Deployment completed successfully"
-                    }
-                }
+                // 4. Запускаємо Docker Compose на App Server
+                sh """
+                    ssh -o StrictHostKeyChecking=no ec2-user@${env.TF_EC2_IP} 'cd /opt/petclinic && \
+                    aws ecr get-login-password --region ${env.TF_AWS_REGION} | docker login --username AWS --password-stdin ${env.TF_ECR_URL} && \
+                    docker compose --env-file app_secrets.env up -d'
+                """
             }
         }
+    }
+}
     }
 
     post {
