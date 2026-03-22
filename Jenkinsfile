@@ -101,23 +101,34 @@ pipeline {
             }
         }
 
-        stage('Deploy to App Server') {
+        stage('Prepare Secrets and Deploy') {
     steps {
         script {
-            // Використовуємо SSH-агент для доступу за PEM-ключем
-            sshagent(['web']) {
+            // 1. Створюємо файл прямо в поточному каталозі (WORKSPACE)
+            // Використовуємо змінні, які ми витягли раніше
+            sh """
+                echo "TF_ECR_URL=${env.TF_ECR_URL}" > app_secrets.env
+                echo "DB_HOST=${env.TF_RDS_ENDPOINT}" >> app_secrets.env
+                echo "DB_PORT=3306" >> app_secrets.env
+                echo "DB_NAME=petclinic" >> app_secrets.env
+                echo "DB_USERNAME=admin" >> app_secrets.env
+                echo "DB_PASSWORD=YourPasswordFromSecretsManager" >> app_secrets.env
+            """
 
-                // 1. Створюємо папку на ВІДДАЛЕНОМУ сервері (якщо її немає)
+            // ПЕРЕВІРКА: чи з'явився файл локально?
+            sh "ls -l app_secrets.env"
+
+            sshagent(['web']) {
+                // 2. Створюємо папку на App Server
                 sh "ssh -o StrictHostKeyChecking=no ec2-user@${env.TF_EC2_IP} 'sudo mkdir -p /opt/petclinic && sudo chown ec2-user:ec2-user /opt/petclinic'"
 
-                // 2. Копіюємо файл .env з Jenkins на App Server
-                // Важливо: ми копіюємо ЛОКАЛЬНИЙ файл на ВІДДАЛЕНИЙ IP
+                // 3. Копіюємо файл (тепер він точно є в поточному каталозі)
                 sh "scp -o StrictHostKeyChecking=no app_secrets.env ec2-user@${env.TF_EC2_IP}:/opt/petclinic/app_secrets.env"
 
-                // 3. Копіюємо docker-compose.yml на App Server
+                // 4. Копіюємо docker-compose.yml
                 sh "scp -o StrictHostKeyChecking=no docker-compose.yml ec2-user@${env.TF_EC2_IP}:/opt/petclinic/docker-compose.yml"
 
-                // 4. Запускаємо Docker Compose на App Server
+                // 5. Запуск
                 sh """
                     ssh -o StrictHostKeyChecking=no ec2-user@${env.TF_EC2_IP} 'cd /opt/petclinic && \
                     aws ecr get-login-password --region ${env.TF_AWS_REGION} | docker login --username AWS --password-stdin ${env.TF_ECR_URL} && \
