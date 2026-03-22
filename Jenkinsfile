@@ -46,8 +46,6 @@ pipeline {
                     }
                 }
             }
-                }
-            }
         }
         stage('Build Artifact') {
             steps {
