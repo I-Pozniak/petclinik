@@ -22,31 +22,33 @@ pipeline {
 
     stages {
         stage('Extract Cloud Params') {
-            steps {
-                script {
-                    echo "📡 Get params from Terraform..."
-                    dir("${env.TF_DIR}") {
-                        sh "terraform init -no-color"
+    steps {
+        script {
+            dir("${env.TF_DIR}") {
+                sh "terraform init -no-color"
 
-                        def rawRegion = sh(script: "terraform output -raw aws_region", returnStdout: true).trim()
-                        def rawECR    = sh(script: "terraform output -raw ecr_repository_url", returnStdout: true).trim()
-                        def rawIP     = sh(script: "terraform output -raw ec2_public_ip", returnStdout: true).trim()
+                // 1. Отримуємо весь вивід у форматі JSON
+                def tfOutputJson = sh(script: "terraform output -json", returnStdout: true).trim()
 
-                        env.AWS_REGION = rawRegion
-                        env.ECR_URL    = rawECR
-                        env.EC2_IP     = rawIP
+                // 2. Парсимо JSON за допомогою JsonSlurper
+                def props = new groovy.json.JsonSlurper().parseText(tfOutputJson)
 
-                        // 4. Verification Check
-                        if (env.AWS_REGION == "" || env.AWS_REGION == "null") {
-                            error "❌ ERROR: Terraform output 'aws_region' is empty! Check your outputs.tf file."
-                        }
+                // 3. Зчитуємо значення (зверни увагу на .value)
+                // Якщо назва в Terraform "aws_region", дістаємо її так:
+                env.AWS_REGION = props.aws_region?.value
+                env.ECR_URL    = props.ecr_repository_url?.value
+                env.EC2_IP     = props.ec2_public_ip?.value
 
-                        echo "✅ Successfully captured Region: ${env.AWS_REGION}"
-                        echo "✅ Successfully captured ECR URL: ${env.ECR_URL}"
-                    }
+                // Перевірка на null
+                if (!env.AWS_REGION) {
+                    error "❌ Ключ 'aws_region' не знайдено в Terraform output! Доступні ключі: ${props.keySet()}"
                 }
+
+                echo "✅ Витягнуто з JSON: Region=${env.AWS_REGION}"
             }
         }
+    }
+}
         stage('Build Artifact') {
             steps {
 
