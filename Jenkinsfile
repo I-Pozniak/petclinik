@@ -29,8 +29,11 @@ pipeline {
                             script: "terraform output -json",
                             returnStdout: true
                         ).trim()
+                        echo "Terraform raw output: ${tfOutputJson}"
 
                         def props = new groovy.json.JsonSlurper().parseText(tfOutputJson)
+                        echo "Terraform output keys: ${props.keySet().join(', ')}"
+                        def tfOutputJson = sh(script: "terraform output -json", returnStdout: true).trim()
 
                         env.TF_AWS_REGION = props.aws_region?.value?.toString()?.trim()
                         env.TF_ECR_URL    = props.ecr_repository_url?.value?.toString()?.trim()
