@@ -114,8 +114,24 @@ pipeline {
 
                 sh "ssh -o StrictHostKeyChecking=no ${remoteUser}@${remoteIp} 'sudo mkdir -p ${remoteDir} && sudo chown ${remoteUser}:${remoteUser} ${remoteDir}'"
 
-                // 3. Копіюємо .env файл
-                sh "scp -o StrictHostKeyChecking=no app_secrets.env ${remoteUser}@${remoteIp}:${remoteDir}/app_secrets.env"
+                // 3. Generate .env file from Jenkins credentials instead of copying static file
+                sh """
+                    cat > app_secrets.env.tmp << EOF
+DB_USERNAME=${env.DB_USERNAME}
+DB_PASSWORD=${env.DB_PASSWORD}
+DB_HOST=${env.DB_HOST}
+DB_NAME=${env.DB_NAME}
+DB_PORT=${env.DB_PORT}
+
+# Spring Boot MySQL Configuration
+MYSQL_URL=jdbc:mysql://${env.DB_HOST}:${env.DB_PORT}/${env.DB_NAME}?createDatabaseIfNotExist=true&useUnicode=true&characterEncoding=UTF-8&useSSL=false&allowPublicKeyRetrieval=true
+MYSQL_USER=${env.DB_USERNAME}
+MYSQL_PASS=${env.DB_PASSWORD}
+EOF
+                """
+
+                sh "scp -o StrictHostKeyChecking=no app_secrets.env.tmp ${remoteUser}@${remoteIp}:${remoteDir}/app_secrets.env"
+                sh "rm -f app_secrets.env.tmp"
 
                 // 4. Копіюємо docker-compose.yml з ПРАВИЛЬНОЇ папки
                 sh "scp -o StrictHostKeyChecking=no ${composeSrc} ${remoteUser}@${remoteIp}:${remoteDir}/docker-compose.yml"
