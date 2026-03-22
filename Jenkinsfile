@@ -12,58 +12,58 @@ pipeline {
         TELEGRAM_TOKEN   = credentials('telegram_token')
         TELEGRAM_CHAT_ID = credentials('telegram_chat_id')
 
-        TF_AWS_REGION = ""
-        TF_ECR_URL    = ""
-        TF_EC2_IP     = ""
-        TF_ALB_URL    = ""
+        TF_AWS_REGION = credentials('TF_AWS_REGION')
+        TF_ECR_URL    = credentials('TF_ECR_URL')
+        TF_EC2_IP     = credentials('TF_EC2_IP')
+        TF_ALB_URL    = credentials('TF_ALB_URL')
     }
 
     stages {
-        stage('Extract Cloud Params') {
-            steps {
-                script {
-                    dir("${env.TF_DIR}") {
-                        sh "terraform init -no-color"
-
-                        def tfOutputJson = sh(
-                            script: "terraform output -json",
-                            returnStdout: true
-                        ).trim()
-
-                        def props = new groovy.json.JsonSlurperClassic().parseText(tfOutputJson)
-
-                        def readTfOutput = { Map outputMap, String key ->
-                            def item = outputMap[key]
-                            if (item == null) {
-                                return ''
-                            }
-                            def rawValue = (item instanceof Map && item.containsKey('value')) ? item['value'] : item
-                            return rawValue == null ? '' : rawValue.toString().trim()
-                        }
-
-                        env.TF_AWS_REGION = readTfOutput(props, 'aws_region')
-                        env.TF_ECR_URL    = props.ecr_repository_url?.value?.toString()?.trim()
-                        env.TF_EC2_IP     = props.ec2_public_ip?.value?.toString()?.trim()
-                        env.TF_ALB_URL    = props.alb_dns_name?.value?.toString()?.trim()
-
-                        if (!env.TF_AWS_REGION) {
-                            error("Terraform output 'aws_region' is empty")
-                        }
-                        if (!env.TF_ECR_URL) {
-                            error("Terraform output 'ecr_repository_url' is empty")
-                        }
-                        if (!env.TF_EC2_IP) {
-                            error("Terraform output 'ec2_public_ip' is empty")
-                        }
-                        if (!env.TF_ALB_URL) {
-                            error("Terraform output 'alb_dns_name' is empty")
-                        }
-
-                        echo "Cloud parameters loaded: Region=${env.TF_AWS_REGION}, ECR=${env.TF_ECR_URL}, EC2=${env.TF_EC2_IP}, ALB=${env.TF_ALB_URL}"
-                    }
-                }
-            }
-        }
+//        stage('Extract Cloud Params') {
+//            steps {
+//                script {
+//                    dir("${env.TF_DIR}") {
+//                        sh "terraform init -no-color"
+//
+//                        def tfOutputJson = sh(
+//                            script: "terraform output -json",
+//                            returnStdout: true
+//                        ).trim()
+//
+//                        def props = new groovy.json.JsonSlurperClassic().parseText(tfOutputJson)
+//
+//                        def readTfOutput = { Map outputMap, String key ->
+//                            def item = outputMap[key]
+//                            if (item == null) {
+//                                return ''
+//                            }
+//                            def rawValue = (item instanceof Map && item.containsKey('value')) ? item['value'] : item
+//                            return rawValue == null ? '' : rawValue.toString().trim()
+//                        }
+//
+//                        env.TF_AWS_REGION = readTfOutput(props, 'aws_region')
+//                        env.TF_ECR_URL    = props.ecr_repository_url?.value?.toString()?.trim()
+//                        env.TF_EC2_IP     = props.ec2_public_ip?.value?.toString()?.trim()
+//                        env.TF_ALB_URL    = props.alb_dns_name?.value?.toString()?.trim()
+//
+//                        if (!env.TF_AWS_REGION) {
+//                            error("Terraform output 'aws_region' is empty")
+//                        }
+//                        if (!env.TF_ECR_URL) {
+//                            error("Terraform output 'ecr_repository_url' is empty")
+//                        }
+//                        if (!env.TF_EC2_IP) {
+//                            error("Terraform output 'ec2_public_ip' is empty")
+//                        }
+//                        if (!env.TF_ALB_URL) {
+//                            error("Terraform output 'alb_dns_name' is empty")
+//                        }
+//
+//                        echo "Cloud parameters loaded: Region=${env.TF_AWS_REGION}, ECR=${env.TF_ECR_URL}, EC2=${env.TF_EC2_IP}, ALB=${env.TF_ALB_URL}"
+//                    }
+//                }
+//            }
+//        }
 
         stage('Build Artifact') {
             steps {
