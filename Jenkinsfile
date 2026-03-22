@@ -107,16 +107,25 @@ pipeline {
                     script {
                         echo "Deploying to ${env.TF_EC2_IP}..."
 
+                        // 1. Securely copy to the ec2-user's home directory first
                         sh """
                             scp -o StrictHostKeyChecking=no \
                             deploy/docker-compose.yml \
-                            ec2-user@${env.TF_EC2_IP}:/opt/petclinic/
+                            ec2-user@${env.TF_EC2_IP}:/home/ec2-user/docker-compose.yml
                         """
 
                         def ecrRegistry = env.TF_ECR_URL.split('/')[0]
 
+                        // 2. SSH in, set up the directory with sudo, move the file, and run Docker
                         sh """
                             ssh -o StrictHostKeyChecking=no ec2-user@${env.TF_EC2_IP} << EOF
+                                # Create the directory if it doesn't exist
+                                sudo mkdir -p /opt/petclinic
+
+                                # Move the file into place
+                                sudo mv /home/ec2-user/docker-compose.yml /opt/petclinic/docker-compose.yml
+
+                                # Navigate and deploy
                                 cd /opt/petclinic
                                 aws ecr get-login-password --region ${env.TF_AWS_REGION} | docker login --username AWS --password-stdin ${ecrRegistry}
                                 export ECR_REPO_URL=${env.TF_ECR_URL}
