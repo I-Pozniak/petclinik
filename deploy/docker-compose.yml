@@ -7,7 +7,7 @@ services:
       - "8080:8080"
 
     env_file:
-      - app_secrets.env
+      - opt/petclinic/app_secrets.env
 
     environment:
       - SPRING_PROFILES_ACTIVE=mysql
