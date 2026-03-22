@@ -13,15 +13,14 @@ pipeline {
         TELEGRAM_TOKEN   = credentials('telegram_token')
         TELEGRAM_CHAT_ID = credentials('telegram_chat_id')
 
-
-        AWS_REGION = ""
-        EC2_IP     = ""
-        ECR_URL    = ""
+        TF_AWS_REGION = ""
+        TF_ECR_URL = ""
+        TF_EC2_IP = ""
         ALB_URL    = ""
     }
 
     stages {
-        sstage('Extract Cloud Params') {
+        stage('Extract Cloud Params') {
     steps {
         script {
             dir("${env.TF_DIR}") {
@@ -30,10 +29,10 @@ pipeline {
                 def tfOutputJson = sh(script: "terraform output -json", returnStdout: true).trim()
                 def props = new groovy.json.JsonSlurper().parseText(tfOutputJson)
 
-                // Використовуємо власні назви, щоб Jenkins не плутався
                 env.TF_AWS_REGION = props.aws_region.value.toString().trim()
                 env.TF_ECR_URL    = props.ecr_repository_url.value.toString().trim()
                 env.TF_EC2_IP     = props.ec2_public_ip.value.toString().trim()
+                env.ALB_URL       = props.alb_dns_name.value.toString().trim()
 
                 echo "🚀 ПАРАМЕТРИ ОТРИМАНО: Регіон=${env.TF_AWS_REGION}, ECR=${env.TF_ECR_URL}"
             }
@@ -48,43 +47,58 @@ pipeline {
         }
 
         stage('Docker Build & Push') {
-    steps {
-        script {
-            // 1. Логінимося в AWS ECR
-            sh "aws ecr get-login-password --region ${env.TF_AWS_REGION} | docker login --username AWS --password-stdin ${env.TF_ECR_URL}"
+            steps {
+                script {
+                    echo "🐳 Pushing Docker image to ECR..."
+                    echo "Region: ${env.AWS_REGION}"
+                    echo "ECR URL: ${env.ECR_URL}"
 
-            // 2. Збираємо образ (переконайся, що ти в папці з Dockerfile)
-            dir("petclinic-app") {
-                sh "docker build -t petclinic-app ."
+                    // Extract registry URL (everything before the last /)
+                    def ecrRegistry = env.ECR_URL.split('/')[0]
+                    echo "ECR Registry: ${ecrRegistry}"
 
-                // 3. Тегуємо та пушимо
-                sh "docker tag petclinic-app:latest ${env.TF_ECR_URL}:latest"
-                sh "docker push ${env.TF_ECR_URL}:latest"
+                    // Login to ECR
+                    sh """
+                        aws ecr get-login-password --region ${env.AWS_REGION} | \
+                        docker login --username AWS --password-stdin ${ecrRegistry}
+                    """
+
+                    // Build and tag Docker image
+                    sh "docker build -t ${env.ECR_URL}:latest -t ${env.ECR_URL}:${env.BUILD_NUMBER} ."
+
+                    // Push both tags
+                    sh "docker push ${env.ECR_URL}:latest"
+                    sh "docker push ${env.ECR_URL}:${env.BUILD_NUMBER}"
+
+                    echo "✅ Docker images pushed successfully"
+                }
             }
         }
-    }
-}
 
         stage('Deploy to App Server') {
             steps {
-
                 sshagent(['petclinic-ssh-key']) {
                     script {
                         echo "🚚 Деплоїмо на ${env.EC2_IP}..."
 
-
+                        // Copy docker-compose file
                         sh "scp -o StrictHostKeyChecking=no deploy/docker-compose.yml ec2-user@${env.EC2_IP}:/opt/petclinic/"
 
+                        // Extract registry URL
+                        def ecrRegistry = env.ECR_URL.split('/')[0]
 
+                        // Deploy on remote server
                         sh """
                         ssh -o StrictHostKeyChecking=no ec2-user@${env.EC2_IP} << 'EOF'
                             cd /opt/petclinic
-                            aws ecr get-login-password --region ${env.AWS_REGION} | docker login --username AWS --password-stdin ${env.ECR_URL.split('/')[0]}
+                            aws ecr get-login-password --region ${env.AWS_REGION} | docker login --username AWS --password-stdin ${ecrRegistry}
                             export ECR_REPO_URL=${env.ECR_URL}
                             docker compose pull
                             docker compose up -d
                         EOF
                         """
+
+                        echo "✅ Deployment completed successfully"
                     }
                 }
             }
@@ -105,3 +119,4 @@ pipeline {
         }
     }
 }
+
