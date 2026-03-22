@@ -118,7 +118,7 @@ pipeline {
 
                         // 2. SSH in, set up the directory with sudo, move the file, and run Docker
                         sh """
-                            ssh -o StrictHostKeyChecking=no ec2-user@${env.TF_EC2_IP} << EOF
+                            ssh -o StrictHostKeyChecking=no ec2-user@${env.TF_EC2_IP} bash -s << 'ENDSSH'
                                 # Create the directory if it doesn't exist
                                 sudo mkdir -p /opt/petclinic
 
@@ -131,7 +131,7 @@ pipeline {
                                 export ECR_REPO_URL=${env.TF_ECR_URL}
                                 docker compose pull
                                 docker compose up -d
-                            EOF
+ENDSSH
                         """
 
                         echo "Deployment completed successfully"

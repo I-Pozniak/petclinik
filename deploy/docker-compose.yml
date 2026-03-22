@@ -1,6 +1,6 @@
 services:
   petclinic:
-    image: ${ECR_REPOSITORY_URI}:latest
+    image: ${TF_ECR_URL}:latest
     container_name: petclinic-app
     restart: always
     ports:
