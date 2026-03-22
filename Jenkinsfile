@@ -26,9 +26,11 @@ pipeline {
                 script {
                     echo "📡 Отримуємо параметри з Terraform..."
                     dir("${env.TF_DIR}") {
-                        sh "terraform init -no-color -input=false"
+                        // Initialize terraform with backend configuration
+                        sh "terraform init -no-color -input=false -reconfigure"
 
-                        env.AWS_REGION = sh(script: "terraform output -raw aws_region 2>/dev/null || echo 'us-east-1'", returnStdout: true).trim()
+                        // Extract outputs with error handling
+                        env.AWS_REGION = sh(script: "terraform output -raw aws_region", returnStdout: true).trim()
                         env.EC2_IP     = sh(script: "terraform output -raw ec2_public_ip", returnStdout: true).trim()
                         env.ECR_URL    = sh(script: "terraform output -raw ecr_repository_url", returnStdout: true).trim()
                         env.ALB_URL    = sh(script: "terraform output -raw alb_dns_name 2>/dev/null || echo 'N/A'", returnStdout: true).trim()
@@ -38,8 +40,15 @@ pipeline {
                         echo "✅ ECR URL: ${env.ECR_URL}"
                         echo "✅ ALB URL: ${env.ALB_URL}"
 
-                        if (env.AWS_REGION == '' || env.AWS_REGION == 'null') {
-                            error("Failed to extract AWS_REGION from Terraform outputs")
+                        // Validate required parameters
+                        if (!env.AWS_REGION || env.AWS_REGION == '' || env.AWS_REGION == 'null') {
+                            error("❌ Failed to extract AWS_REGION from Terraform outputs")
+                        }
+                        if (!env.ECR_URL || env.ECR_URL == '' || env.ECR_URL == 'null') {
+                            error("❌ Failed to extract ECR_URL from Terraform outputs")
+                        }
+                        if (!env.EC2_IP || env.EC2_IP == '' || env.EC2_IP == 'null') {
+                            error("❌ Failed to extract EC2_IP from Terraform outputs")
                         }
                     }
                 }
