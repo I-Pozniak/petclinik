@@ -21,38 +21,21 @@ pipeline {
     }
 
     stages {
-        stage('Extract Cloud Params') {
+        sstage('Extract Cloud Params') {
     steps {
         script {
             dir("${env.TF_DIR}") {
                 sh "terraform init -no-color"
 
-                // 1. Отримуємо JSON
                 def tfOutputJson = sh(script: "terraform output -json", returnStdout: true).trim()
-
-                // ДЕБАГ: виводимо весь JSON, щоб побачити структуру (це з'явиться в логах)
-                println "DEBUG JSON: ${tfOutputJson}"
-
                 def props = new groovy.json.JsonSlurper().parseText(tfOutputJson)
 
-                // 2. Використовуємо безпечне отримання через Map.get()
-                // Це виключає помилки, якщо об'єкт раптом має іншу структуру
-                def regionObj = props.get('aws_region')
-                def ecrObj    = props.get('ecr_repository_url')
-                def ipObj     = props.get('ec2_public_ip')
+                // Використовуємо власні назви, щоб Jenkins не плутався
+                env.TF_AWS_REGION = props.aws_region.value.toString().trim()
+                env.TF_ECR_URL    = props.ecr_repository_url.value.toString().trim()
+                env.TF_EC2_IP     = props.ec2_public_ip.value.toString().trim()
 
-                // 3. Присвоюємо значення (важливо: примусово перетворюємо на String)
-                env.AWS_REGION = regionObj?.value?.toString()
-                env.ECR_URL    = ecrObj?.value?.toString()
-                env.EC2_IP     = ipObj?.value?.toString()
-
-                // 4. Фінальна перевірка
-                if (env.AWS_REGION == null || env.AWS_REGION == "null" || env.AWS_REGION == "") {
-                    // Якщо впаде тут, ми побачимо, що саме було в об'єкті
-                    error "❌ Значення для 'aws_region' порожнє! Вміст об'єкта: ${regionObj}"
-                }
-
-                echo "✅ Вдалося! Регіон: ${env.AWS_REGION}, ECR: ${env.ECR_URL}"
+                echo "🚀 ПАРАМЕТРИ ОТРИМАНО: Регіон=${env.TF_AWS_REGION}, ECR=${env.TF_ECR_URL}"
             }
         }
     }
@@ -64,34 +47,23 @@ pipeline {
             }
         }
 
-        stage('Docker Push to ECR') {
-            steps {
-                script {
-                    echo "🐳 Pushing Docker image to ECR..."
-                    echo "Region: ${env.AWS_REGION}"
-                    echo "ECR URL: ${env.ECR_URL}"
+        stage('Docker Build & Push') {
+    steps {
+        script {
+            // 1. Логінимося в AWS ECR
+            sh "aws ecr get-login-password --region ${env.TF_AWS_REGION} | docker login --username AWS --password-stdin ${env.TF_ECR_URL}"
 
-                    // Extract registry URL (everything before the last /)
-                    def ecrRegistry = env.ECR_URL.split('/')[0]
-                    echo "ECR Registry: ${ecrRegistry}"
+            // 2. Збираємо образ (переконайся, що ти в папці з Dockerfile)
+            dir("petclinic-app") {
+                sh "docker build -t petclinic-app ."
 
-                    // Login to ECR
-                    sh """
-                        aws ecr get-login-password --region ${env.AWS_REGION} | \
-                        docker login --username AWS --password-stdin ${ecrRegistry}
-                    """
-
-                    // Build and tag Docker image
-                    sh "docker build -t ${env.ECR_URL}:latest -t ${env.ECR_URL}:${env.BUILD_NUMBER} ."
-
-                    // Push both tags
-                    sh "docker push ${env.ECR_URL}:latest"
-                    sh "docker push ${env.ECR_URL}:${env.BUILD_NUMBER}"
-
-                    echo "✅ Docker images pushed successfully"
-                }
+                // 3. Тегуємо та пушимо
+                sh "docker tag petclinic-app:latest ${env.TF_ECR_URL}:latest"
+                sh "docker push ${env.TF_ECR_URL}:latest"
             }
         }
+    }
+}
 
         stage('Deploy to App Server') {
             steps {
