@@ -104,18 +104,8 @@ pipeline {
         stage('Prepare Secrets and Deploy') {
     steps {
         script {
-            // 1. Створюємо файл прямо в поточному каталозі (WORKSPACE)
-            // Використовуємо змінні, які ми витягли раніше
-            sh """
-                echo "TF_ECR_URL=${env.TF_ECR_URL}" > app_secrets.env
-                echo "DB_HOST=${env.TF_RDS_ENDPOINT}" >> app_secrets.env
-                echo "DB_PORT=3306" >> app_secrets.env
-                echo "DB_NAME=petclinic" >> app_secrets.env
-                echo "DB_USERNAME=admin" >> app_secrets.env
-                echo "DB_PASSWORD=YourPasswordFromSecretsManager" >> app_secrets.env
-            """
 
-            // ПЕРЕВІРКА: чи з'явився файл локально?
+
             sh "ls -l app_secrets.env"
 
             sshagent(['web']) {
