@@ -27,24 +27,32 @@ pipeline {
             dir("${env.TF_DIR}") {
                 sh "terraform init -no-color"
 
-                // 1. Отримуємо весь вивід у форматі JSON
+                // 1. Отримуємо JSON
                 def tfOutputJson = sh(script: "terraform output -json", returnStdout: true).trim()
 
-                // 2. Парсимо JSON за допомогою JsonSlurper
+                // ДЕБАГ: виводимо весь JSON, щоб побачити структуру (це з'явиться в логах)
+                println "DEBUG JSON: ${tfOutputJson}"
+
                 def props = new groovy.json.JsonSlurper().parseText(tfOutputJson)
 
-                // 3. Зчитуємо значення (зверни увагу на .value)
-                // Якщо назва в Terraform "aws_region", дістаємо її так:
-                env.AWS_REGION = props.aws_region?.value
-                env.ECR_URL    = props.ecr_repository_url?.value
-                env.EC2_IP     = props.ec2_public_ip?.value
+                // 2. Використовуємо безпечне отримання через Map.get()
+                // Це виключає помилки, якщо об'єкт раптом має іншу структуру
+                def regionObj = props.get('aws_region')
+                def ecrObj    = props.get('ecr_repository_url')
+                def ipObj     = props.get('ec2_public_ip')
 
-                // Перевірка на null
-                if (!env.AWS_REGION) {
-                    error "❌ Ключ 'aws_region' не знайдено в Terraform output! Доступні ключі: ${props.keySet()}"
+                // 3. Присвоюємо значення (важливо: примусово перетворюємо на String)
+                env.AWS_REGION = regionObj?.value?.toString()
+                env.ECR_URL    = ecrObj?.value?.toString()
+                env.EC2_IP     = ipObj?.value?.toString()
+
+                // 4. Фінальна перевірка
+                if (env.AWS_REGION == null || env.AWS_REGION == "null" || env.AWS_REGION == "") {
+                    // Якщо впаде тут, ми побачимо, що саме було в об'єкті
+                    error "❌ Значення для 'aws_region' порожнє! Вміст об'єкта: ${regionObj}"
                 }
 
-                echo "✅ Витягнуто з JSON: Region=${env.AWS_REGION}"
+                echo "✅ Вдалося! Регіон: ${env.AWS_REGION}, ECR: ${env.ECR_URL}"
             }
         }
     }
