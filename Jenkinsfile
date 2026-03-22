@@ -101,26 +101,28 @@ pipeline {
             }
         }
 
-        stage('Prepare Secrets and Deploy') {
+        stage('Deploy to App Server') {
     steps {
         script {
-
-
-            sh "ls -l app_secrets.env"
+            // Використовуємо змінні, які ми витягли раніше з Terraform
+            def remoteUser = "ec2-user"
+            def remoteIp   = env.TF_EC2_IP
+            def remoteDir  = "/opt/petclinic"
+            def composeSrc = "deploy/docker-compose.yml" // Шлях, який ми знайшли
 
             sshagent(['web']) {
-                // 2. Створюємо папку на App Server
-                sh "ssh -o StrictHostKeyChecking=no ec2-user@${env.TF_EC2_IP} 'sudo mkdir -p /opt/petclinic && sudo chown ec2-user:ec2-user /opt/petclinic'"
 
-                // 3. Копіюємо файл (тепер він точно є в поточному каталозі)
-                sh "scp -o StrictHostKeyChecking=no app_secrets.env ec2-user@${env.TF_EC2_IP}:/opt/petclinic/app_secrets.env"
+                sh "ssh -o StrictHostKeyChecking=no ${remoteUser}@${remoteIp} 'sudo mkdir -p ${remoteDir} && sudo chown ${remoteUser}:${remoteUser} ${remoteDir}'"
 
-                // 4. Копіюємо docker-compose.yml
-                sh "scp -o StrictHostKeyChecking=no docker-compose.yml ec2-user@${env.TF_EC2_IP}:/opt/petclinic/docker-compose.yml"
+                // 3. Копіюємо .env файл
+                sh "scp -o StrictHostKeyChecking=no app_secrets.env ${remoteUser}@${remoteIp}:${remoteDir}/app_secrets.env"
 
-                // 5. Запуск
+                // 4. Копіюємо docker-compose.yml з ПРАВИЛЬНОЇ папки
+                sh "scp -o StrictHostKeyChecking=no ${composeSrc} ${remoteUser}@${remoteIp}:${remoteDir}/docker-compose.yml"
+
+                // 5. Запускаємо додаток на сервері
                 sh """
-                    ssh -o StrictHostKeyChecking=no ec2-user@${env.TF_EC2_IP} 'cd /opt/petclinic && \
+                    ssh -o StrictHostKeyChecking=no ${remoteUser}@${remoteIp} 'cd ${remoteDir} && \
                     aws ecr get-login-password --region ${env.TF_AWS_REGION} | docker login --username AWS --password-stdin ${env.TF_ECR_URL} && \
                     docker compose --env-file app_secrets.env up -d'
                 """
