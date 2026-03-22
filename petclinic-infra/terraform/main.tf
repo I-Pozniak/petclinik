@@ -21,13 +21,13 @@ module "database" {
 }
 
 module "compute" {
-  source            = "./modules/compute"
-  project_name      = var.project_name
-  vpc_id            = module.vpc.vpc_id
-  public_subnet_ids = module.vpc.public_subnet_ids
-  app_sg_id         = module.security.app_sg_id
-  alb_sg_id         = module.security.application_load_balancer.id
-  key_name          = var.key_name
-  db_secret_arn     = module.database.db_secret_arn
+  source             = "./modules/compute"
+  project_name       = var.project_name
+  vpc_id             = module.vpc.vpc_id
+  public_subnet_ids  = module.vpc.public_subnet_ids
+  app_sg_id          = module.security.app_sg_id
+  alb_sg_id          = module.security.application_load_balancer.id
+  key_name           = var.key_name
+  db_secret_arn      = module.database.db_secret_arn
   jenkins_ingress_ip = var.jenkins_ingress_ip
 }

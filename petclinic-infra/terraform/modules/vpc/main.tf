@@ -17,10 +17,10 @@ resource "aws_internet_gateway" "internet_gateway" {
 }
 
 resource "aws_subnet" "public_subnets" {
-  vpc_id     = aws_vpc.main.id
-  count      = length(var.public_subnet_cidrs)
-  cidr_block = element(var.public_subnet_cidrs, count.index)
-  availability_zone = data.aws_availability_zones.available.names[count.index % length(data.aws_availability_zones.available.names)]
+  vpc_id                  = aws_vpc.main.id
+  count                   = length(var.public_subnet_cidrs)
+  cidr_block              = element(var.public_subnet_cidrs, count.index)
+  availability_zone       = data.aws_availability_zones.available.names[count.index % length(data.aws_availability_zones.available.names)]
   map_public_ip_on_launch = true
   tags = {
     Name = "${var.project_name}_subnet_${count.index + 1}"
