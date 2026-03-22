@@ -103,7 +103,7 @@ pipeline {
 
         stage('Deploy to App Server') {
             steps {
-                sshagent(['petclinic-ssh-key']) {
+                sshagent(['web']) {
                     script {
                         echo "Deploying to ${env.TF_EC2_IP}..."
 
