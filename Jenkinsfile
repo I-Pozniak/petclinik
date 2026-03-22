@@ -19,6 +19,7 @@ pipeline {
     }
 
     stages {
+//TODO: fix fetch env variables from terraform output
 //        stage('Extract Cloud Params') {
 //            steps {
 //                script {
@@ -114,29 +115,11 @@ pipeline {
 
                 sh "ssh -o StrictHostKeyChecking=no ${remoteUser}@${remoteIp} 'sudo mkdir -p ${remoteDir} && sudo chown ${remoteUser}:${remoteUser} ${remoteDir}'"
 
-                // 3. Generate .env file from Jenkins credentials instead of copying static file
-                sh """
-                    cat > app_secrets.env.tmp << EOF
-DB_USERNAME=${env.DB_USERNAME}
-DB_PASSWORD=${env.DB_PASSWORD}
-DB_HOST=${env.DB_HOST}
-DB_NAME=${env.DB_NAME}
-DB_PORT=${env.DB_PORT}
-
-# Spring Boot MySQL Configuration
-MYSQL_URL=jdbc:mysql://${env.DB_HOST}:${env.DB_PORT}/${env.DB_NAME}?createDatabaseIfNotExist=true&useUnicode=true&characterEncoding=UTF-8&useSSL=false&allowPublicKeyRetrieval=true
-MYSQL_USER=${env.DB_USERNAME}
-MYSQL_PASS=${env.DB_PASSWORD}
-EOF
-                """
-
-                sh "scp -o StrictHostKeyChecking=no app_secrets.env.tmp ${remoteUser}@${remoteIp}:${remoteDir}/app_secrets.env"
-                sh "rm -f app_secrets.env.tmp"
-
-                // 4. Копіюємо docker-compose.yml з ПРАВИЛЬНОЇ папки
+                // Copy docker-compose.yml
                 sh "scp -o StrictHostKeyChecking=no ${composeSrc} ${remoteUser}@${remoteIp}:${remoteDir}/docker-compose.yml"
 
-                // 5. Запускаємо додаток на сервері
+                // Deploy application (app_secrets.env must exist on the server)
+                // Note: app_secrets.env is NOT copied - it persists on the server
                 sh """
                     ssh -o StrictHostKeyChecking=no ${remoteUser}@${remoteIp} 'cd ${remoteDir} && \
                     aws ecr get-login-password --region ${env.TF_AWS_REGION} | docker login --username AWS --password-stdin ${env.TF_ECR_URL} && \
