@@ -95,6 +95,11 @@ ENV/
 .docker/
 docker-compose.override.yml
 
+### Secrets ###
+**/app_secrets.env
+**/*.env
+!**/*.env.example
+
 ### Jenkins ###
 .jenkins/
 jenkins_home/
