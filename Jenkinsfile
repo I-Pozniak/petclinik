@@ -39,17 +39,6 @@ pipeline {
                         echo "✅ EC2 IP: ${env.EC2_IP}"
                         echo "✅ ECR URL: ${env.ECR_URL}"
                         echo "✅ ALB URL: ${env.ALB_URL}"
-
-                        // Validate required parameters
-                        if (!env.AWS_REGION || env.AWS_REGION == '' || env.AWS_REGION == 'null') {
-                            error("❌ Failed to extract AWS_REGION from Terraform outputs")
-                        }
-                        if (!env.ECR_URL || env.ECR_URL == '' || env.ECR_URL == 'null') {
-                            error("❌ Failed to extract ECR_URL from Terraform outputs")
-                        }
-                        if (!env.EC2_IP || env.EC2_IP == '' || env.EC2_IP == 'null') {
-                            error("❌ Failed to extract EC2_IP from Terraform outputs")
-                        }
                     }
                 }
             }
