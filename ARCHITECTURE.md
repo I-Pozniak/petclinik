@@ -441,8 +441,7 @@ graph TB
 - **Access Control**: SSH Key-based authentication
 
 ### Monitoring & Logging
-- **Docker Logs**: JSON file driver (10MB max, 3 files rotation)
-- **CloudWatch**: IAM policy attached for CloudWatch agent
+- **CloudWatch**: EC2 and RDS monitoring
 - **Health Checks**: ALB health check on root path (/)
 
 
